@@ -11,7 +11,8 @@ from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Model
 import helpers
 
-from constants import *
+from constants import GLOVE_DIR, WORD2VEC_TXT, MAX_NB_WORDS, \
+    MAX_SEQUENCE_LENGTH, VALIDATION_SPLIT, EMBEDDING_DIM
 
 print('Processing text dataset')
 
@@ -22,13 +23,12 @@ helpers.write_dataset_to_file(labels_names=labels_names,
                               texts=texts_normalized,
                               fileName="full_dataset_with_forms")
 
-
 unique_labels = set(labels_names)
 print("Number of distinct classes: {}".format(len(unique_labels)))
 
 print('Found %s texts.' % len(texts_normalized))
 
-if not os.path.exists(os.path.join(GLOVE_DIR,WORD2VEC_TXT)):
+if not os.path.exists(os.path.join(GLOVE_DIR, WORD2VEC_TXT)):
     print('Create txt file from Russian binary word2vec file...')
     helpers.make_txt_word2vec_from_bin()
 
@@ -36,36 +36,12 @@ print('Indexing word vectors.')
 
 embeddings_index = helpers.read_embeddings()
 
-print('Found %s word vectors.' % len(embeddings_index))
-
-# second, prepare text samples and their labels
-# print('Processing text dataset')
-#
-# texts = []  # list of text samples
-# labels_index = {}  # dictionary mapping label name to numeric id
-# labels = []  # list of label ids
-# for name in sorted(os.listdir(TEXT_DATA_DIR)):
-#     path = os.path.join(TEXT_DATA_DIR, name)
-#     if os.path.isdir(path):
-#         label_id = len(labels_index)
-#         labels_index[name] = label_id
-#         for fname in sorted(os.listdir(path)):
-#             if fname.isdigit():
-#                 fpath = os.path.join(path, fname)
-#                 if sys.version_info < (3,):
-#                     f = open(fpath)
-#                 else:
-#                     f = open(fpath, encoding='latin-1')
-#                 texts.append(f.read())
-#                 f.close()
-#                 labels.append(label_id)
-#
-# print('Found %s texts.' % len(texts))
+print('Found %s word vectors.' % len(list(embeddings_index.keys())))
 
 # finally, vectorize the text samples into a 2D integer tensor
-tokenizer = Tokenizer(nb_words=MAX_NB_WORDS)
-tokenizer.fit_on_texts(texts)
-sequences = tokenizer.texts_to_sequences(texts)
+tokenizer = Tokenizer(nb_words=MAX_NB_WORDS, filters='!"#$%&()*+,-./:;<=>?@[\\]^`{|}~\t\n')
+tokenizer.fit_on_texts(texts_normalized)
+sequences = tokenizer.texts_to_sequences(texts_normalized)
 
 word_index = tokenizer.word_index
 print('Found %s unique tokens.' % len(word_index))

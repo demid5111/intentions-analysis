@@ -87,7 +87,7 @@ def preprocess_raw_dataset(raw_dataset):
 
 
 def _call_mystem(text):
-    command = 'echo "{}" | tee tmp/logfile.txt && ./lib/mystem -cgin --format json logfile.txt'.format(text)
+    command = 'echo "{}" | tee tmp/logfile.txt && ./lib/mystem -cgin --format json tmp/logfile.txt'.format(text)
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
     process.wait()
     return [line.decode('utf-8') for line in process.stdout]

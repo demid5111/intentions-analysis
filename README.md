@@ -19,3 +19,6 @@ To get an example, please contact monadv@yandex.ru
 Note:
 When using mystem we get specific form names like "V" or "PART". At the sime time, embeddings that we use
 work with full form names. Mapping is described here: https://github.com/akutuzov/universal-pos-tags/blob/4653e8a9154e93fe2f417c7fdb7a357b7d6ce333/ru-rnc.map
+
+Note:
+The code was checked only for the macOS platform. Please expect inconsistencies for Win/Linux platforms
