@@ -34,9 +34,17 @@ if not os.path.exists(os.path.join(GLOVE_DIR, WORD2VEC_TXT)):
 
 print('Indexing word vectors.')
 
-embeddings_index = helpers.read_embeddings()
+# to limit memory allocation, we need to get only those embeddings that have
+# counterparts in text for that, we need to:
+# 1. make set of all words
+# 2. take from embeddings store only necessary ones
+unique_words = set([i for t in texts_normalized for i in set(t.split())])
+
+embeddings_index = helpers.read_embeddings(unique_words)
 
 print('Found %s word vectors.' % len(list(embeddings_index.keys())))
+
+# now we need to make texts - texts and not list of words
 
 # finally, vectorize the text samples into a 2D integer tensor
 tokenizer = Tokenizer(nb_words=MAX_NB_WORDS, filters='!"#$%&()*+,-./:;<=>?@[\\]^`{|}~\t\n')

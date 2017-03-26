@@ -10,7 +10,7 @@ from constants import RESULTS_DIR, GLOVE_DIR, WORD2VEC_BIN, WORD2VEC_TXT, INTENT
 
 def read_russian_csv(base_dir):
     russian_dataset = []
-    for folder in os.listdir(base_dir)[3:4]:
+    for folder in os.listdir(base_dir):
         new_path = os.path.join(base_dir, folder)
         if not os.path.isdir(new_path):
             continue
@@ -113,7 +113,7 @@ def _compile_normalized_text(mystem_json_list):
         'ADVPRO': 'ADV',
         'ANUM': 'ADJ',
         'APRO': 'DET',
-        'COM ': 'ADJ',
+        'COM': 'ADJ',
         'CONJ': 'SCONJ',
         'INTJ': 'INTJ',
         'NONLEX': 'X',
@@ -151,14 +151,15 @@ def make_txt_word2vec_from_bin():
     model.save_word2vec_format(os.path.join(GLOVE_DIR,WORD2VEC_TXT), binary=False)
 
 
-def read_embeddings():
+def read_embeddings(unique_words=()):
     embeddings_index = {}
     f = open(os.path.join(GLOVE_DIR, WORD2VEC_TXT))
     for line in f:
         values = line.split()
         word = values[0]
         coefs = np.asarray(values[1:], dtype='float32')
-        embeddings_index[word] = coefs
+        if not len(unique_words) or (word in unique_words):
+            embeddings_index[word] = coefs
     f.close()
     return embeddings_index
 
@@ -175,6 +176,7 @@ def make_normalized_dataset():
 
     texts, text_ids, labels, labels_names, labels_index = preprocess_raw_dataset(cleaned_up_raw_dataset)
 
-    texts_normalized = normalize_dataset(texts, limit=10)
+    texts_normalized = normalize_dataset(texts,limit=len(texts)+1)
+    texts_normalized = [" ".join(x) for x in texts_normalized]
 
     return texts_normalized, text_ids, labels, labels_names, labels_index
