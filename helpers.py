@@ -87,7 +87,9 @@ def preprocess_raw_dataset(raw_dataset):
 
 
 def _call_mystem(text):
-    command = 'echo "{}" | tee tmp/logfile.txt && ./lib/mystem -cgin --format json tmp/logfile.txt'.format(text)
+    import random
+    i = random.randrange(100000)
+    command = 'echo "{}" | tee tmp/{}.txt && ./lib/mystem -cgin --format json tmp/{}.txt'.format(text, i, i)
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
     process.wait()
     return [line.decode('utf-8') for line in process.stdout]
@@ -134,15 +136,33 @@ def _compile_normalized_text(mystem_json_list):
             res_list.append('{}_{}'.format(norm_form, translated_form_name))
     return res_list
 
-
+NUMBER_OF_TEXTS_PROCESSED=1
 def normalize_dataset(texts, limit):
-    texts_normalized = ['' for x in texts]
-    for (i, text) in list(enumerate(texts))[:limit]:
-        print('{}/{}...'.format(i, len(texts)))
-        output = _call_mystem(text)
-        texts_normalized[i] = _compile_normalized_text(_parse_mystem_output(output))
+    # texts_normalized = ['' for x in texts]
+    # for (i, text) in list(enumerate(texts))[:limit]:
+    #     print('{}/{}...'.format(i, len(texts)))
+    #     output = _call_mystem(text)
+    #     texts_normalized[i] = _compile_normalized_text(_parse_mystem_output(output))
+    from multiprocessing import Pool as ThreadPool
+    from multiprocessing import cpu_count
+    print("Number of threads: {}".format(cpu_count()))
+    chunk_size = 1000
+    total_number_chunks = round(len(texts)/chunk_size)
+    texts_normalized = []
+    for i in range(total_number_chunks):
+        print("Analysing chunk {}/{}".format(i+1, total_number_chunks))
+        pool = ThreadPool(cpu_count())
+        tmp = pool.map(compose_for_normalize, texts[i*chunk_size:(i+1)*chunk_size])
+        pool.close()
+        pool.join()
+        texts_normalized.extend(tmp)
     return texts_normalized
 
+def compose_for_normalize(text):
+    global NUMBER_OF_TEXTS_PROCESSED
+    NUMBER_OF_TEXTS_PROCESSED+=1
+    output = _call_mystem(text)
+    return _compile_normalized_text(_parse_mystem_output(output))
 
 def make_txt_word2vec_from_bin():
     from gensim.models import KeyedVectors
