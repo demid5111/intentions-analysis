@@ -12,16 +12,23 @@ from keras.models import Model
 import helpers
 
 from constants import GLOVE_DIR, WORD2VEC_TXT, MAX_NB_WORDS, \
-    MAX_SEQUENCE_LENGTH, VALIDATION_SPLIT, EMBEDDING_DIM
+    MAX_SEQUENCE_LENGTH, VALIDATION_SPLIT, EMBEDDING_DIM, EXCEL_NORMALIZED_DATASET_NAME, RESULTS_DIR
 
 print('Processing text dataset')
 
-texts_normalized, text_ids, labels, labels_names, labels_index = helpers.make_normalized_dataset()
-helpers.write_dataset_to_file(labels_names=labels_names,
-                              labels=labels,
-                              text_ids=text_ids,
-                              texts=texts_normalized,
-                              fileName="full_dataset_with_forms")
+if not os.path.exists(os.path.join(RESULTS_DIR, EXCEL_NORMALIZED_DATASET_NAME)):
+    print('Create normalized dataset with forms...')
+    texts_normalized, text_ids, labels, labels_names, labels_index = helpers.make_normalized_dataset()
+    helpers.write_dataset_to_file(labels_names=labels_names,
+                                  labels=labels,
+                                  text_ids=text_ids,
+                                  texts=texts_normalized,
+                                  fileName="full_dataset_with_forms")
+else:
+    file_name = os.path.join(RESULTS_DIR, EXCEL_NORMALIZED_DATASET_NAME)
+    print('Read normalized dataset from file {}...'.format(file_name))
+    texts_normalized, text_ids, labels, labels_names, labels_index = helpers.read_normalized_dataset(
+        file_name=file_name)
 
 unique_labels = set(labels_names)
 print("Number of distinct classes: {}".format(len(unique_labels)))
@@ -42,7 +49,7 @@ unique_words = set([i for t in texts_normalized for i in set(t.split())])
 
 embeddings_index = helpers.read_embeddings(unique_words)
 
-print('Found %s word vectors.' % len(list(embeddings_index.keys())))
+print('Found %s word vectors.' % len(embeddings_index))
 
 # now we need to make texts - texts and not list of words
 
@@ -113,10 +120,11 @@ model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['acc'])
 
+NUMBER_OF_EPOCHS = 2
 # happy learning!
 model.fit(x_train, y_train, validation_data=(x_val, y_val),
-          nb_epoch=2, batch_size=128)
+          nb_epoch=NUMBER_OF_EPOCHS, batch_size=128)
 
-model.save('results/my_model.h5')
+model.save('results/russian_{}_ep.h5'.format(NUMBER_OF_EPOCHS))
 
 print('Saved model.')

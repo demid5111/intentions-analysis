@@ -5,6 +5,8 @@ import subprocess
 import json
 import re
 import numpy as np
+import sys
+
 from constants import RESULTS_DIR, GLOVE_DIR, WORD2VEC_BIN, WORD2VEC_TXT, INTENTIONS_DIR
 
 
@@ -89,10 +91,17 @@ def preprocess_raw_dataset(raw_dataset):
 def _call_mystem(text):
     import random
     i = random.randrange(100000)
-    command = 'echo "{}" | tee tmp/{}.txt && ./lib/mystem -cgin --format json tmp/{}.txt'.format(text, i, i)
+    with open('tmp/{}.txt'.format(i), 'w') as f:
+        f.write(text)
+    command = './lib/mystem -cgin --format json tmp/{}.txt'.format(i)
     process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
-    process.wait()
-    return [line.decode('utf-8') for line in process.stdout]
+    try:
+        process.wait(endtime=150000)
+    except subprocess.TimeoutExpired:
+        print("Attention timeout!!!")
+    res = [line.decode('utf-8') for line in process.stdout]
+    # print('Result ', res)
+    return res
 
 
 def _parse_mystem_output(output_list):
@@ -136,21 +145,15 @@ def _compile_normalized_text(mystem_json_list):
             res_list.append('{}_{}'.format(norm_form, translated_form_name))
     return res_list
 
-NUMBER_OF_TEXTS_PROCESSED=1
 def normalize_dataset(texts, limit):
-    # texts_normalized = ['' for x in texts]
-    # for (i, text) in list(enumerate(texts))[:limit]:
-    #     print('{}/{}...'.format(i, len(texts)))
-    #     output = _call_mystem(text)
-    #     texts_normalized[i] = _compile_normalized_text(_parse_mystem_output(output))
     from multiprocessing import Pool as ThreadPool
     from multiprocessing import cpu_count
     print("Number of threads: {}".format(cpu_count()))
     chunk_size = 1000
     total_number_chunks = round(len(texts)/chunk_size)
     texts_normalized = []
-    for i in range(total_number_chunks):
-        print("Analysing chunk {}/{}".format(i+1, total_number_chunks))
+    for i in range(0,total_number_chunks+1):
+        print("Analysing chunk: %d/%d   \r" % (i+1, total_number_chunks))
         pool = ThreadPool(cpu_count())
         tmp = pool.map(compose_for_normalize, texts[i*chunk_size:(i+1)*chunk_size])
         pool.close()
@@ -159,9 +162,12 @@ def normalize_dataset(texts, limit):
     return texts_normalized
 
 def compose_for_normalize(text):
-    global NUMBER_OF_TEXTS_PROCESSED
-    NUMBER_OF_TEXTS_PROCESSED+=1
-    output = _call_mystem(text)
+    newLine = text.replace('\\','')
+    newLine = newLine.replace('!','')
+    newLine = newLine.replace('\n',' ')
+    newLine = newLine.replace('\r',' ')
+    newLine = newLine.replace('\t',' ')
+    output = _call_mystem(newLine)
     return _compile_normalized_text(_parse_mystem_output(output))
 
 def make_txt_word2vec_from_bin():
@@ -185,7 +191,7 @@ def read_embeddings(unique_words=()):
 
 
 def clean_up_raw_dataset(raw_dataset):
-    return [x for x in raw_dataset if len(get_label_name(x)) == 2]
+    return [x for x in raw_dataset if len(get_label_name(x)) == 2 and len(get_text(x)) != 0]
 
 
 def make_normalized_dataset():
@@ -196,7 +202,34 @@ def make_normalized_dataset():
 
     texts, text_ids, labels, labels_names, labels_index = preprocess_raw_dataset(cleaned_up_raw_dataset)
 
-    texts_normalized = normalize_dataset(texts,limit=len(texts)+1)
-    texts_normalized = [" ".join(x) for x in texts_normalized]
+    res_normalized = normalize_dataset(texts,limit=len(texts)+1)
 
+    texts_normalized = [" ".join(x) for x in res_normalized]
+    indexes_to_remove = [i for (i,x) in enumerate(texts_normalized) if not len(x)]
+    to_subtract = 0
+    for i in indexes_to_remove:
+        index = i - to_subtract
+        del text_ids[index]
+        del labels[index]
+        del labels_names[index]
+        del texts_normalized[index]
+        to_subtract += 1
+
+    extra_labels = set(list(labels_index.keys()))-set(labels_names)
+    for label in extra_labels:
+        del labels_index[label]
+
+    return texts_normalized, text_ids, labels, labels_names, labels_index
+
+
+def read_normalized_dataset(file_name):
+    import pandas
+    f = pandas.read_excel(file_name, sheetname='Intentions')
+    texts_normalized = list(f['Text'])
+    labels_names = list(f['Label_names'])
+    labels=list(f['Label_ID'])
+    text_ids =list(f['Comment_ID'])
+    labels_index = {}
+    for (label, id) in zip(labels_names, labels):
+        labels_index[label] = id
     return texts_normalized, text_ids, labels, labels_names, labels_index

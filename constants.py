@@ -11,3 +11,5 @@ RESULTS_DIR = BASE_DIR + '/results'
 # Word2Vec related constants
 WORD2VEC_BIN = 'ruscorpora_1_300_10.bin'
 WORD2VEC_TXT = 'ruscorpora_1_300_10.txt'
+
+EXCEL_NORMALIZED_DATASET_NAME = 'full_dataset_with_forms.xlsx'
