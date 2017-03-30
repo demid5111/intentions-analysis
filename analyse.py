@@ -6,9 +6,13 @@ np.random.seed(1337)
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils.np_utils import to_categorical
-from keras.layers import Dense, Input, Flatten
+from keras.layers import Dense, Input, Flatten, Dropout, Activation
 from keras.layers import Conv1D, MaxPooling1D, Embedding
 from keras.models import Model
+from keras.models import load_model
+from keras.layers.recurrent import LSTM
+from sklearn.metrics import classification_report
+
 import helpers
 
 from constants import GLOVE_DIR, WORD2VEC_TXT, MAX_NB_WORDS, \
@@ -19,6 +23,7 @@ print('Processing text dataset')
 if not os.path.exists(os.path.join(RESULTS_DIR, EXCEL_NORMALIZED_DATASET_NAME)):
     print('Create normalized dataset with forms...')
     texts_normalized, text_ids, labels, labels_names, labels_index = helpers.make_normalized_dataset()
+    labels_letter, labels_digit_names = helpers.make_letters_class_map(labels_names)
     helpers.write_dataset_to_file(labels_names=labels_names,
                                   labels=labels,
                                   text_ids=text_ids,
@@ -29,9 +34,10 @@ else:
     print('Read normalized dataset from file {}...'.format(file_name))
     texts_normalized, text_ids, labels, labels_names, labels_index = helpers.read_normalized_dataset(
         file_name=file_name)
+    labels_letter, labels_digit_names, labels_letters_index = helpers.make_letters_class_map(labels_names)
 
-unique_labels = set(labels_names)
-print("Number of distinct classes: {}".format(len(unique_labels)))
+class_num = len(set(labels_digit_names))
+print("Number of distinct classes: {}".format(class_num))
 
 print('Found %s texts.' % len(texts_normalized))
 
@@ -63,7 +69,7 @@ print('Found %s unique tokens.' % len(word_index))
 
 data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
 
-labels = to_categorical(np.asarray(labels))
+labels = to_categorical(np.asarray(labels_digit_names))
 print('Shape of data tensor:', data.shape)
 print('Shape of label tensor:', labels.shape)
 
@@ -98,7 +104,7 @@ embedding_layer = Embedding(nb_words,
                             EMBEDDING_DIM,
                             weights=[embedding_matrix],
                             input_length=MAX_SEQUENCE_LENGTH,
-                            trainable=False)
+                            trainable=True)
 
 print('Training model.')
 
@@ -110,10 +116,21 @@ text = MaxPooling1D(5)(text)
 text = Conv1D(128, 5, activation='relu')(text)
 text = MaxPooling1D(5)(text)
 text = Conv1D(128, 5, activation='relu')(text)
-text = MaxPooling1D(35)(text)
+text = MaxPooling1D(15)(text)
 text = Flatten()(text)
 text = Dense(128, activation='relu')(text)
-preds = Dense(len(labels_index), activation='softmax')(text)
+preds = Dense(class_num, activation='softmax')(text)
+
+
+# embedding_layer=Embedding(nb_words, EMBEDDING_DIM, trainable=True, input_length=MAX_SEQUENCE_LENGTH)
+# sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
+# embedded_sequences = embedding_layer(sequence_input)
+# text=LSTM(64, return_sequences=True)(embedded_sequences)
+# text=LSTM(64)(text)
+# text=Dropout(0.5)(text)
+# text=Dense(class_num(text)
+# preds=Activation('sigmoid')(text)
+
 
 model = Model(sequence_input, preds)
 model.compile(loss='categorical_crossentropy',
@@ -126,5 +143,10 @@ model.fit(x_train, y_train, validation_data=(x_val, y_val),
           nb_epoch=NUMBER_OF_EPOCHS, batch_size=128)
 
 model.save('results/russian_{}_ep.h5'.format(NUMBER_OF_EPOCHS))
-
 print('Saved model.')
+
+model = load_model('results/russian_{}_ep.h5'.format(NUMBER_OF_EPOCHS))
+print('Loaded model.')
+
+y_est=model.predict(x_val)
+print(classification_report(np.argmax(y_val, axis=1), np.argmax(y_est, axis=1)))

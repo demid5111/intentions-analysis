@@ -43,7 +43,7 @@ def get_text_id(el):
     return el['text_id'].strip()
 
 
-def write_dataset_to_file(labels_names=(), labels=(), text_ids=(), texts=(), fileName='full_dataset'):
+def write_dataset_to_file(labels_names=(), labels=(), text_ids=(), texts=(),fileName='full_dataset'):
     """
     Writes the dataset into the Excel file with the structure: label_names|label_id|comment_id|text
     :param labels_names:
@@ -221,6 +221,21 @@ def make_normalized_dataset():
 
     return texts_normalized, text_ids, labels, labels_names, labels_index
 
+def make_letters_class_map(labels_names):
+    labels_letters_index = {}
+    for label in labels_names:
+        label_name = label[0]
+        if label_name not in list(labels_letters_index.keys()):
+            labels_letters_index[label_name] = len(labels_letters_index.keys())
+
+    labels_letter = []
+    labels_digit_names = []
+    for i in labels_names:
+        label_name = i[0]
+        label_digit = int(i[1])-1
+        labels_letter.append(labels_letters_index[label_name])
+        labels_digit_names.append(label_digit)
+    return labels_letter, labels_digit_names, labels_letters_index
 
 def read_normalized_dataset(file_name):
     import pandas
