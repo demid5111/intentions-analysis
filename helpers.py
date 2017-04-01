@@ -5,7 +5,6 @@ import subprocess
 import json
 import re
 import numpy as np
-import sys
 
 from constants import RESULTS_DIR, GLOVE_DIR, WORD2VEC_BIN, WORD2VEC_TXT, INTENTIONS_DIR
 
@@ -43,7 +42,7 @@ def get_text_id(el):
     return el['text_id'].strip()
 
 
-def write_dataset_to_file(labels_names=(), labels=(), text_ids=(), texts=(),fileName='full_dataset'):
+def write_dataset_to_file(labels_names=(), labels=(), text_ids=(), texts=(), fileName='full_dataset'):
     """
     Writes the dataset into the Excel file with the structure: label_names|label_id|comment_id|text
     :param labels_names:
@@ -145,36 +144,39 @@ def _compile_normalized_text(mystem_json_list):
             res_list.append('{}_{}'.format(norm_form, translated_form_name))
     return res_list
 
-def normalize_dataset(texts, limit):
+
+def normalize_dataset(texts):
     from multiprocessing import Pool as ThreadPool
     from multiprocessing import cpu_count
     print("Number of threads: {}".format(cpu_count()))
     chunk_size = 1000
-    total_number_chunks = round(len(texts)/chunk_size)
+    total_number_chunks = round(len(texts) / chunk_size)
     texts_normalized = []
-    for i in range(0,total_number_chunks+1):
-        print("Analysing chunk: %d/%d   \r" % (i+1, total_number_chunks))
+    for i in range(0, total_number_chunks + 1):
+        print("Analysing chunk: %d/%d   \r" % (i + 1, total_number_chunks))
         pool = ThreadPool(cpu_count())
-        tmp = pool.map(compose_for_normalize, texts[i*chunk_size:(i+1)*chunk_size])
+        tmp = pool.map(compose_for_normalize, texts[i * chunk_size:(i + 1) * chunk_size])
         pool.close()
         pool.join()
         texts_normalized.extend(tmp)
     return texts_normalized
 
+
 def compose_for_normalize(text):
-    newLine = text.replace('\\','')
-    newLine = newLine.replace('!','')
-    newLine = newLine.replace('\n',' ')
-    newLine = newLine.replace('\r',' ')
-    newLine = newLine.replace('\t',' ')
-    output = _call_mystem(newLine)
+    new_line = text.replace('\\', '')
+    new_line = new_line.replace('!', '')
+    new_line = new_line.replace('\n', ' ')
+    new_line = new_line.replace('\r', ' ')
+    new_line = new_line.replace('\t', ' ')
+    output = _call_mystem(new_line)
     return _compile_normalized_text(_parse_mystem_output(output))
+
 
 def make_txt_word2vec_from_bin():
     from gensim.models import KeyedVectors
 
-    model = KeyedVectors.load_word2vec_format(os.path.join(GLOVE_DIR,WORD2VEC_BIN), binary=True)
-    model.save_word2vec_format(os.path.join(GLOVE_DIR,WORD2VEC_TXT), binary=False)
+    model = KeyedVectors.load_word2vec_format(os.path.join(GLOVE_DIR, WORD2VEC_BIN), binary=True)
+    model.save_word2vec_format(os.path.join(GLOVE_DIR, WORD2VEC_TXT), binary=False)
 
 
 def read_embeddings(unique_words=()):
@@ -202,10 +204,10 @@ def make_normalized_dataset():
 
     texts, text_ids, labels, labels_names, labels_index = preprocess_raw_dataset(cleaned_up_raw_dataset)
 
-    res_normalized = normalize_dataset(texts,limit=len(texts)+1)
+    res_normalized = normalize_dataset(texts)
 
     texts_normalized = [" ".join(x) for x in res_normalized]
-    indexes_to_remove = [i for (i,x) in enumerate(texts_normalized) if not len(x)]
+    indexes_to_remove = [i for (i, x) in enumerate(texts_normalized) if not len(x)]
     to_subtract = 0
     for i in indexes_to_remove:
         index = i - to_subtract
@@ -215,36 +217,69 @@ def make_normalized_dataset():
         del texts_normalized[index]
         to_subtract += 1
 
-    extra_labels = set(list(labels_index.keys()))-set(labels_names)
+    extra_labels = set(list(labels_index.keys())) - set(labels_names)
     for label in extra_labels:
         del labels_index[label]
 
     return texts_normalized, text_ids, labels, labels_names, labels_index
+
 
 def make_letters_class_map(labels_names):
     labels_letters_index = {}
     for label in labels_names:
         label_name = label[0]
         if label_name not in list(labels_letters_index.keys()):
-            labels_letters_index[label_name] = len(labels_letters_index.keys())
+            labels_letters_index[label_name] = len(labels_letters_index)
 
     labels_letter = []
     labels_digit_names = []
     for i in labels_names:
         label_name = i[0]
-        label_digit = int(i[1])-1
+        label_digit = int(i[1]) - 1
         labels_letter.append(labels_letters_index[label_name])
         labels_digit_names.append(label_digit)
     return labels_letter, labels_digit_names, labels_letters_index
+
 
 def read_normalized_dataset(file_name):
     import pandas
     f = pandas.read_excel(file_name, sheetname='Intentions')
     texts_normalized = list(f['Text'])
     labels_names = list(f['Label_names'])
-    labels=list(f['Label_ID'])
-    text_ids =list(f['Comment_ID'])
+    labels = list(f['Label_ID'])
+    text_ids = list(f['Comment_ID'])
     labels_index = {}
-    for (label, id) in zip(labels_names, labels):
-        labels_index[label] = id
+    for (label, label_id) in zip(labels_names, labels):
+        labels_index[label] = label_id
     return texts_normalized, text_ids, labels, labels_names, labels_index
+
+
+def generalize_labels(labels_names):
+    """
+    If you want to cut the number of classes to make better training results
+    specify rules for translating detailed classes to general super-classes
+    make sure you have letters typed in the target language
+    :param labels_names: list of labels names from the dataset
+    """
+    generalization_rule = {"а": ["а", "б", "в", "г", "д", "е"],
+                           "б": ["ё", "ж", "з", "и", "к", "л"],
+                           "в": ["м", "н", "о", "п", "р", "с"],
+                           "г": ["т", "у", "ф", "х", "ц", "ч", "ш"],
+                           "д": ["щ", "ь", "ъ", "ы", "ю", "я"]}
+
+    new_labels_index = {}
+    for key in generalization_rule.keys():
+        new_labels_index[key] = len(new_labels_index)
+
+    new_labels = []
+    new_labels_ids = []
+    for label in labels_names:
+        new_name = ""
+        for (key, value) in generalization_rule.items():
+            # now we just check the first letter of the class to find it in the values list
+            # in generalization_rule
+            if label[0] in value:
+                new_name = key
+        new_labels.append(new_name)
+        new_labels_ids.append(new_labels_index[new_name])
+    return new_labels_ids, new_labels, new_labels_index

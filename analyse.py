@@ -36,7 +36,16 @@ else:
         file_name=file_name)
     labels_letter, labels_digit_names, labels_letters_index = helpers.make_letters_class_map(labels_names)
 
-class_num = len(set(labels_digit_names))
+NEED_TO_GENERALIZE = True
+if (NEED_TO_GENERALIZE):
+    new_labels_ids, new_labels, new_labels_index = helpers.generalize_labels(labels_names)
+
+# if you want to train on different labels (only letters, only digits, mixed)
+# change this variable
+labels_for_training = labels_digit_names
+
+# number of distinct classes
+class_num = len(set(labels_for_training))
 print("Number of distinct classes: {}".format(class_num))
 
 print('Found %s texts.' % len(texts_normalized))
@@ -69,7 +78,7 @@ print('Found %s unique tokens.' % len(word_index))
 
 data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
 
-labels = to_categorical(np.asarray(labels_digit_names))
+labels = to_categorical(np.asarray(labels_for_training))
 print('Shape of data tensor:', data.shape)
 print('Shape of label tensor:', labels.shape)
 
