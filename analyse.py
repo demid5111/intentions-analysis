@@ -36,17 +36,21 @@ else:
         file_name=file_name)
     labels_letter, labels_digit_names, labels_letters_index = helpers.make_letters_class_map(labels_names)
 
-NEED_TO_GENERALIZE = True
-if (NEED_TO_GENERALIZE):
-    new_labels_ids, new_labels, new_labels_index = helpers.generalize_labels(labels_names)
+CURRENT_MODE = helpers.ANALYSIS_MODE.ONLY_DIGITS
 
-# if you want to train on different labels (only letters, only digits, mixed)
-# change this variable
-labels_for_training = labels_digit_names
-
-# number of distinct classes
-class_num = len(set(labels_for_training))
-print("Number of distinct classes: {}".format(class_num))
+if CURRENT_MODE == helpers.ANALYSIS_MODE.GENERALIZE_LETTERS:
+    group_labels_ids, group_labels, group_labels_index = helpers.generalize_labels(labels_names)
+    labels_for_training = group_labels_ids
+    labels_to_id_dic = group_labels_index
+elif CURRENT_MODE == helpers.ANALYSIS_MODE.MIXED:
+    labels_for_training = labels
+    labels_to_id_dic = labels_index
+elif CURRENT_MODE == helpers.ANALYSIS_MODE.ONLY_LETTERS:
+    labels_for_training = labels_letter
+    labels_to_id_dic = labels_letters_index
+elif CURRENT_MODE == helpers.ANALYSIS_MODE.ONLY_DIGITS:
+    labels_for_training = labels_digit_names
+    labels_to_id_dic = {str(i):i for i in set(labels_digit_names)}
 
 print('Found %s texts.' % len(texts_normalized))
 
@@ -56,29 +60,15 @@ if not os.path.exists(os.path.join(GLOVE_DIR, WORD2VEC_TXT)):
 
 print('Indexing word vectors.')
 
-# to limit memory allocation, we need to get only those embeddings that have
-# counterparts in text for that, we need to:
-# 1. make set of all words
-# 2. take from embeddings store only necessary ones
-unique_words = set([i for t in texts_normalized for i in set(t.split())])
-
-embeddings_index = helpers.read_embeddings(unique_words)
-
-print('Found %s word vectors.' % len(embeddings_index))
-
-# now we need to make texts - texts and not list of words
-
 # finally, vectorize the text samples into a 2D integer tensor
-tokenizer = Tokenizer(nb_words=MAX_NB_WORDS, filters='!"#$%&()*+,-./:;<=>?@[\\]^`{|}~\t\n')
-tokenizer.fit_on_texts(texts_normalized)
-sequences = tokenizer.texts_to_sequences(texts_normalized)
 
-word_index = tokenizer.word_index
-print('Found %s unique tokens.' % len(word_index))
-
-data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
-
+data, word_index = helpers.tokenize_texts(texts_normalized=texts_normalized)
 labels = to_categorical(np.asarray(labels_for_training))
+
+# number of distinct classes
+class_num = labels.shape[1]
+print("Number of distinct classes: {}".format(class_num))
+
 print('Shape of data tensor:', data.shape)
 print('Shape of label tensor:', labels.shape)
 
@@ -96,60 +86,25 @@ y_val = labels[-nb_validation_samples:]
 
 print('Preparing embedding matrix.')
 
-# prepare embedding matrix
-nb_words = min(MAX_NB_WORDS, len(word_index))
-embedding_matrix = np.zeros((nb_words, EMBEDDING_DIM))
-for word, i in word_index.items():
-    if i >= MAX_NB_WORDS:
-        continue
-    embedding_vector = embeddings_index.get(word)
-    if embedding_vector is not None:
-        # words not found in embedding index will be all-zeros.
-        embedding_matrix[i] = embedding_vector
 
-# load pre-trained word embeddings into an Embedding layer
-# note that we set trainable = False so as to keep the embeddings fixed
-embedding_layer = Embedding(nb_words,
-                            EMBEDDING_DIM,
-                            weights=[embedding_matrix],
-                            input_length=MAX_SEQUENCE_LENGTH,
-                            trainable=True)
+nb_words, embedding_matrix = helpers.create_embedding_matrix(word_index=word_index, texts_normalized=texts_normalized)
 
 print('Training model.')
 
-# train a 1D convnet with global maxpooling
-sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
-embedded_sequences = embedding_layer(sequence_input)
-text = Conv1D(128, 5, activation='relu')(embedded_sequences)
-text = MaxPooling1D(5)(text)
-text = Conv1D(128, 5, activation='relu')(text)
-text = MaxPooling1D(5)(text)
-text = Conv1D(128, 5, activation='relu')(text)
-text = MaxPooling1D(15)(text)
-text = Flatten()(text)
-text = Dense(128, activation='relu')(text)
-preds = Dense(class_num, activation='softmax')(text)
+# sequence_input, preds = helpers.construct_cnn(nb_words=nb_words, class_num=class_num, embedding_matrix=embedding_matrix)
 
-
-# embedding_layer=Embedding(nb_words, EMBEDDING_DIM, trainable=True, input_length=MAX_SEQUENCE_LENGTH)
-# sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
-# embedded_sequences = embedding_layer(sequence_input)
-# text=LSTM(64, return_sequences=True)(embedded_sequences)
-# text=LSTM(64)(text)
-# text=Dropout(0.5)(text)
-# text=Dense(class_num(text)
-# preds=Activation('sigmoid')(text)
-
+sequence_input, preds = helpers.construct_lstm(nb_words=nb_words, class_num=class_num,
+                                               embedding_matrix=embedding_matrix)
 
 model = Model(sequence_input, preds)
 model.compile(loss='categorical_crossentropy',
               optimizer='rmsprop',
               metrics=['acc'])
 
-NUMBER_OF_EPOCHS = 2
+NUMBER_OF_EPOCHS = 1
 # happy learning!
 model.fit(x_train, y_train, validation_data=(x_val, y_val),
-          nb_epoch=NUMBER_OF_EPOCHS, batch_size=128)
+          nb_epoch=NUMBER_OF_EPOCHS, batch_size=400)
 
 model.save('results/russian_{}_ep.h5'.format(NUMBER_OF_EPOCHS))
 print('Saved model.')
@@ -157,5 +112,12 @@ print('Saved model.')
 model = load_model('results/russian_{}_ep.h5'.format(NUMBER_OF_EPOCHS))
 print('Loaded model.')
 
-y_est=model.predict(x_val)
-print(classification_report(np.argmax(y_val, axis=1), np.argmax(y_est, axis=1)))
+label_list = [0 for i in range(len(list(labels_to_id_dic.keys())))]
+for (key, value) in labels_to_id_dic.items():
+    try:
+        label_list[value] = key
+    except IndexError:
+        print(value, key)
+
+y_est = model.predict(x_val)
+print(classification_report(np.argmax(y_val, axis=1), np.argmax(y_est, axis=1), target_names=label_list))

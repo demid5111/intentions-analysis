@@ -5,9 +5,19 @@ import subprocess
 import json
 import re
 import numpy as np
+from keras.engine import Input
+from keras.layers import Embedding, LSTM, Dropout, Dense, Activation, Conv1D, MaxPooling1D, Flatten
+from keras.preprocessing.sequence import pad_sequences
+from keras.preprocessing.text import Tokenizer
 
-from constants import RESULTS_DIR, GLOVE_DIR, WORD2VEC_BIN, WORD2VEC_TXT, INTENTIONS_DIR
+from constants import RESULTS_DIR, GLOVE_DIR, WORD2VEC_BIN, WORD2VEC_TXT, INTENTIONS_DIR, EMBEDDING_DIM, \
+    MAX_SEQUENCE_LENGTH, MAX_NB_WORDS
 
+class ANALYSIS_MODE:
+    MIXED = 0
+    ONLY_DIGITS = 1
+    ONLY_LETTERS = 2
+    GENERALIZE_LETTERS = 3
 
 def read_russian_csv(base_dir):
     russian_dataset = []
@@ -249,9 +259,14 @@ def read_normalized_dataset(file_name):
     labels = list(f['Label_ID'])
     text_ids = list(f['Comment_ID'])
     labels_index = {}
+    new_labels = []
+    new_id = 0
     for (label, label_id) in zip(labels_names, labels):
-        labels_index[label] = label_id
-    return texts_normalized, text_ids, labels, labels_names, labels_index
+        if label not in labels_index:
+            labels_index[label] = new_id
+            new_id += 1
+        new_labels.append(labels_index[label])
+    return texts_normalized, text_ids, new_labels, labels_names, labels_index
 
 
 def generalize_labels(labels_names):
@@ -261,11 +276,10 @@ def generalize_labels(labels_names):
     make sure you have letters typed in the target language
     :param labels_names: list of labels names from the dataset
     """
-    generalization_rule = {"а": ["а", "б", "в", "г", "д", "е"],
-                           "б": ["ё", "ж", "з", "и", "к", "л"],
-                           "в": ["м", "н", "о", "п", "р", "с"],
-                           "г": ["т", "у", "ф", "х", "ц", "ч", "ш"],
-                           "д": ["щ", "ь", "ъ", "ы", "ю", "я"]}
+    generalization_rule = {"Оптимистическая интенция": ["а", "б", "в", "г", "д", "е", "ж", "з"],
+                           "Критическая интенция": ["и", "к", "л", "м", "н", "о", "п", "р", "с", "т"],
+                           "Пессимистическая интенция": ["у", "ф", "х", "ц", "ч", "ш"],
+                           "Неопределенная интенция": ["щ", "э", "ю", "я", "l", "w", "r", "u", "i", "s", "d", "f", "z"]}
 
     new_labels_index = {}
     for key in generalization_rule.keys():
@@ -283,3 +297,70 @@ def generalize_labels(labels_names):
         new_labels.append(new_name)
         new_labels_ids.append(new_labels_index[new_name])
     return new_labels_ids, new_labels, new_labels_index
+
+
+def construct_lstm(nb_words, class_num, embedding_matrix):
+    # load pre-trained word embeddings into an Embedding layer
+    embedding_layer = Embedding(nb_words,
+                                EMBEDDING_DIM,
+                                weights=[embedding_matrix],
+                                input_length=MAX_SEQUENCE_LENGTH,
+                                trainable=True)
+    sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
+    embedded_sequences = embedding_layer(sequence_input)
+    text = LSTM(64, return_sequences=True)(embedded_sequences)
+    text = LSTM(64)(text)
+    text = Dropout(0.5)(text)
+    text = Dense(class_num)(text)
+    return sequence_input, Activation('sigmoid')(text)
+
+
+def construct_cnn(nb_words, class_num, embedding_matrix):
+    # load pre-trained word embeddings into an Embedding layer
+    embedding_layer = Embedding(nb_words,
+                                EMBEDDING_DIM,
+                                weights=[embedding_matrix],
+                                input_length=MAX_SEQUENCE_LENGTH,
+                                trainable=True)
+    sequence_input = Input(shape=(MAX_SEQUENCE_LENGTH,), dtype='int32')
+    embedded_sequences = embedding_layer(sequence_input)
+    text = Conv1D(128, 5, activation='relu')(embedded_sequences)
+    text = MaxPooling1D(5)(text)
+    text = Conv1D(128, 5, activation='relu')(text)
+    text = MaxPooling1D(5)(text)
+    text = Conv1D(128, 5, activation='relu')(text)
+    text = MaxPooling1D(15)(text)
+    text = Flatten()(text)
+    text = Dense(128, activation='relu')(text)
+    return sequence_input, Dense(class_num, activation='softmax')(text)
+
+def create_embedding_matrix(word_index, texts_normalized):
+    # to limit memory allocation, we need to get only those embeddings that have
+    # counterparts in text for that, we need to:
+    # 1. make set of all words
+    # 2. take from embeddings store only necessary ones
+    unique_words = set([i for t in texts_normalized for i in set(t.split())])
+    nb_words = min(MAX_NB_WORDS, len(word_index))
+    embedding_matrix = np.zeros((nb_words, EMBEDDING_DIM))
+    embeddings_index = read_embeddings(unique_words)
+
+    print('Found %s word vectors.' % len(embeddings_index))
+    for word, i in word_index.items():
+        if i >= MAX_NB_WORDS:
+            continue
+        embedding_vector = embeddings_index.get(word)
+        if embedding_vector is not None:
+            # words not found in embedding index will be all-zeros.
+            embedding_matrix[i] = embedding_vector
+    return nb_words, embedding_matrix
+
+def tokenize_texts(texts_normalized):
+    tokenizer = Tokenizer(nb_words=MAX_NB_WORDS, filters='!"#$%&()*+,-./:;<=>?@[\\]^`{|}~\t\n')
+    tokenizer.fit_on_texts(texts_normalized)
+    sequences = tokenizer.texts_to_sequences(texts_normalized)
+
+    word_index = tokenizer.word_index
+    print('Found %s unique tokens.' % len(word_index))
+
+    data = pad_sequences(sequences, maxlen=MAX_SEQUENCE_LENGTH)
+    return data, word_index
