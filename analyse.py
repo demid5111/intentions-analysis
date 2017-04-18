@@ -93,18 +93,15 @@ print('Training model.')
 
 # sequence_input, preds = helpers.construct_cnn(nb_words=nb_words, class_num=class_num, embedding_matrix=embedding_matrix)
 
-sequence_input, preds = helpers.construct_lstm(nb_words=nb_words, class_num=class_num,
-                                               embedding_matrix=embedding_matrix)
+sequence_input, preds = helpers.construct_lstm(nb_words=nb_words, class_num=class_num, embedding_matrix=embedding_matrix)
 
 model = Model(sequence_input, preds)
-model.compile(loss='categorical_crossentropy',
-              optimizer='rmsprop',
-              metrics=['acc'])
+model.compile(loss='categorical_crossentropy',optimizer='rmsprop',metrics=['acc'])
 
-NUMBER_OF_EPOCHS = 1
+NUMBER_OF_EPOCHS = 3
 # happy learning!
 model.fit(x_train, y_train, validation_data=(x_val, y_val),
-          nb_epoch=NUMBER_OF_EPOCHS, batch_size=400)
+          nb_epoch=NUMBER_OF_EPOCHS, batch_size=200)
 
 model.save('results/russian_{}_ep.h5'.format(NUMBER_OF_EPOCHS))
 print('Saved model.')
