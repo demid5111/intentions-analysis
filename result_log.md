@@ -1,3 +1,19 @@
+LSTM 2 GENERALIZE_LETTERS          precision    recall  f1-score   support
+            Контрольно-реактивный       0.29      0.40      0.34      1012
+Манипулятивный тип, доминирование       0.38      0.45      0.41       920
+     Информативно-воспроизводящий       0.37      0.11      0.17       734
+           Волюнтивно-директивный       0.19      0.04      0.06       577
+         Эмотивно-консолидирующий       0.37      0.54      0.44       995
+                      avg / total       0.33      0.34      0.31      4238
+                      
+LSTM 5 GENERALIZE_LETTERS          precision    recall  f1-score   support
+         Эмотивно-консолидирующий       0.40      0.46      0.42       995
+            Контрольно-реактивный       0.30      0.38      0.34      1012
+Манипулятивный тип, доминирование       0.44      0.38      0.41       920
+     Информативно-воспроизводящий       0.32      0.31      0.31       734
+           Волюнтивно-директивный       0.24      0.12      0.16       577
+                      avg / total       0.35      0.35      0.34      4238
+
 LSTM 2 ONLY_DIGITS       precision    recall  f1-score   support
                       0       0.00      0.00      0.00       254
                       1       0.00      0.00      0.00       165
@@ -11,20 +27,6 @@ LSTM 5 ONLY_DIGITS       precision    recall  f1-score   support
                       2       0.73      0.80      0.76      2527
                       3       0.54      0.56      0.55      1292
             avg / total       0.63      0.65      0.63      4238
-
-LSTM 2 GENERALIZE_LETTERS  precision    recall  f1-score   support
-Пессимистическая интенция       0.00      0.00      0.00      1104
- Оптимистическая интенция       0.36      0.40      0.38      1257
-     Критическая интенция       0.44      0.72      0.55      1737
-  Неопределенная интенция       0.00      0.00      0.00       140
-              avg / total       0.29      0.41      0.34      4238
-
-LSTM 5 GENERALIZE_LETTERS  precision    recall  f1-score   support
-Пессимистическая интенция       0.34      0.28      0.31      1104
- Оптимистическая интенция       0.41      0.51      0.46      1257
-     Критическая интенция       0.50      0.45      0.47      1737
-  Неопределенная интенция       0.05      0.07      0.06       140
-              avg / total       0.42      0.41      0.41      4238
 
 LSTM 2 ONLY_LETTERS    precision    recall  f1-score   support
                   б       0.00      0.00      0.00       225
@@ -173,20 +175,21 @@ LSTM 100 MIXED       precision    recall  f1-score   support
         avg / total       0.06      0.05      0.05      4238
 
 ###############################CNN
-CNN 20 ONLY_DIGITS
-             precision    recall  f1-score   support
-          0       0.00      0.00      0.00       254
-          1       0.00      0.00      0.00       165
-          2       0.60      1.00      0.75      2527
-          3       0.00      0.00      0.00      1292
-avg / total       0.36      0.60      0.45      4238
-CNN 5 GENERALIZE_LETTERS
-                           precision    recall  f1-score   support
- Оптимистическая интенция       0.00      0.00      0.00      1257
-Пессимистическая интенция       0.00      0.00      0.00      1104
-     Критическая интенция       0.41      1.00      0.58      1737
-  Неопределенная интенция       0.00      0.00      0.00       140
-              avg / total       0.17      0.41      0.24      4238
+CNN 20 ONLY_DIGITS   precision    recall  f1-score   support
+                  0       0.00      0.00      0.00       254
+                  1       0.00      0.00      0.00       165
+                  2       0.60      1.00      0.75      2527
+                  3       0.00      0.00      0.00      1292
+        avg / total       0.36      0.60      0.45      4238
+        
+CNN 20 GENERALIZE_LETTERS          precision    recall  f1-score   support
+Манипулятивный тип, доминирование       0.00      0.00      0.00       920
+           Волюнтивно-директивный       0.00      0.00      0.00       577
+         Эмотивно-консолидирующий       0.00      0.00      0.00       995
+            Контрольно-реактивный       0.24      1.00      0.39      1012
+     Информативно-воспроизводящий       0.00      0.00      0.00       734
+                      avg / total       0.06      0.24      0.09      4238
+
 CNN 5 ONLY_LETTERS
              precision    recall  f1-score   support
           б       0.00      0.00      0.00       225
@@ -216,8 +219,7 @@ CNN 5 ONLY_LETTERS
           х       0.00      0.00      0.00        62
 avg / total       0.01      0.10      0.02      4238
 
-CNN 5 MIXED
-             precision    recall  f1-score   support
+CNN 5 MIXED  precision    recall  f1-score   support
          б2       0.00      0.00      0.00        23
          ж4       0.00      0.00      0.00       163
          т2       0.00      0.00      0.00         4

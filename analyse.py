@@ -36,7 +36,7 @@ else:
         file_name=file_name)
     labels_letter, labels_digit_names, labels_letters_index = helpers.make_letters_class_map(labels_names)
 
-CURRENT_MODE = helpers.ANALYSIS_MODE.ONLY_DIGITS
+CURRENT_MODE = helpers.ANALYSIS_MODE.GENERALIZE_LETTERS
 
 if CURRENT_MODE == helpers.ANALYSIS_MODE.GENERALIZE_LETTERS:
     group_labels_ids, group_labels, group_labels_index = helpers.generalize_labels(labels_names)
@@ -98,7 +98,7 @@ sequence_input, preds = helpers.construct_lstm(nb_words=nb_words, class_num=clas
 model = Model(sequence_input, preds)
 model.compile(loss='categorical_crossentropy',optimizer='rmsprop',metrics=['acc'])
 
-NUMBER_OF_EPOCHS = 3
+NUMBER_OF_EPOCHS = 5
 # happy learning!
 model.fit(x_train, y_train, validation_data=(x_val, y_val),
           nb_epoch=NUMBER_OF_EPOCHS, batch_size=200)
